@@ -4,6 +4,7 @@ from selenium import webdriver
 import re
 import time
 import numpy as np
+import pandas as pd
 
 #natural language processing
 import nltk
@@ -343,17 +344,18 @@ def remove_references(text):
     return text
 
 def clean_speech_text(df):
-    df['full_text'] = df['full_text'].apply(lambda x: remove_references(x))
-    df['full_text'] = df['full_text'].str.replace('\n', ' ')
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'(http)\S+(htm)(l)?', '', x))
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'(www.)\S+', '', x))
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'[\d]', '', x))
-    df['full_text'] = df['full_text'].str.replace('—', ' ')
-    df['full_text'] = df['full_text'].str.replace('-', ' ')
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'[^\w\s]', '', x))
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'([Rr]eturn to text)', '', x))
-    df['full_text'] = df['full_text'].apply(lambda x: re.sub(r'([Pp]lay [vV]ideo)', '', x))
-    return df
+    df_new = df.copy()
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: remove_references(x))
+    df_new.loc['full_text'] = df_new['full_text'].str.replace('\n', ' ')
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'(http)\S+(htm)(l)?', '', x))
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'(www.)\S+', '', x))
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'[\d]', '', x))
+    df_new.loc['full_text'] = df_new['full_text'].str.replace('—', ' ')
+    df_new.loc['full_text'] = df_new['full_text'].str.replace('-', ' ')
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'[^\w\s]', '', x))
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'([Rr]eturn to text)', '', x))
+    df_new.loc['full_text'] = df_new['full_text'].apply(lambda x: re.sub(r'([Pp]lay [vV]ideo)', '', x))
+    return df_new
 
 
 def get_wordnet_pos(word):
@@ -383,3 +385,43 @@ def tokenize_and_remove_stopwords(text):
 def get_most_common_words(tokens, num=20):
     fdist = FreqDist(tokens)
     return fdist.most_common(num)
+
+def remove_stop_words(tokens_list):
+    stopwords_without_punct = []
+    for word in stopwords.words('english'):
+        word = word.replace("'", "")
+        stopwords_without_punct.append(word)
+    stopped_tokens = [w for w in tokens_list if w not in stopwords_without_punct]
+    return [w for w in stopped_tokens if len(w) > 2]
+
+def convert_to_datetime(df):
+    df_new = df.copy()
+    df_new.loc['speech_datetime'] = df_new['speech_date'].apply(lambda x: pd.to_datetime(x))
+    df_new.loc['speech_year'] = df_new['speech_datetime'].apply(lambda x: x.year)
+    df_new.loc['speech_month'] = df_new['speech_datetime'].apply(lambda x: x.month)
+    return df_new
+
+def plot_most_common_words(df, article_num=9):
+    fig = plt.figure(figsize=(15, 6))
+    fig.suptitle(f"Most common words in Speech: {df.iloc[article_num]['title']}")
+    left = fig.add_subplot(121)
+    right = fig.add_subplot(122)
+    
+    # left subplot without stop words
+    sns.barplot(x=[x[0] for x in df.iloc[article_num]['common_20_stopped_lemm_words']],
+            y=[x[1] for x in df.iloc[article_num]['common_20_stopped_lemm_words']], ax=left, color='#ffd966')#palette = mycmap)
+    left.set_xticklabels(left.get_xticklabels(), rotation=45, horizontalalignment="right")
+    left.set_title('Lemmatized Tokens with Stop Words Removed')
+    
+    # right subplot with all tokens
+    sns.barplot(x=[x[0] for x in df.iloc[article_num]['common_20_lemm_words']],
+            y=[x[1] for x in df.iloc[article_num]['common_20_lemm_words']], ax=right, color='gray')#palette = mycmap)
+    right.set_xticklabels(right.get_xticklabels(), rotation=45, horizontalalignment="right")      
+    right.set_title('Lemmatized Tokens')
+                 
+    plt.show()
+    
+
+
+
+
