@@ -659,7 +659,8 @@ def get_scores(corpus,
                
     data = {'num_topics': num_topics, 'coherence': coherence_scores, 'perplexity': perplexity_scores}
     return pd.DataFrame(data)
-                 
+          
+
 def run_and_save_final_lda_model(corpus,
                                  dictionary,
                                  df,
@@ -667,15 +668,12 @@ def run_and_save_final_lda_model(corpus,
                                  num_topics = 11,
                                  passes = 10,
                                  random_state = 100):
-    """
-    
-    """
     # fit the lda model
     lda_model = gensim.models.LdaMulticore(bow_corpus, num_topics=num_topics, id2word=dictionary,
                                        random_state = random_state, passes = passes)
     
     # pickle the lda model
-    pickle.dump(lda_model, open('lda_model' + str(num_topics) + '.sav', 'wb'))
+    pickle.dump(lda_model, open('lda_model' + str(num_topics) + '.sava', 'wb'))
     
     # create the visualization
     vis = pyLDAvis.gensim.prepare(lda_model, corpus, dictionary=lda_model.id2word)
@@ -683,10 +681,63 @@ def run_and_save_final_lda_model(corpus,
     pyLDAvis.save_html(vis, 'lda_' + str(num_topics) + '_topics.html')
     
     # get the dominant topic information
-    df_dominant = get_dominant_topic(ldamodel=lda_model, corpus=bow_corpus)
+    df_dominant = get_dominant_topic(lda_model, bow_corpus)
     # pickle the dominant topics
     df_dominant.to_pickle('df_dominant_' + str(num_topics) + '_topics.pkl')
     
     return lda_model, df_dominant
+
                  
-           
+def get_dominant_topic(lda_model, corpus):
+    topics_df = pd.DataFrame()
+
+    # Get main topic in each document
+    for i, row in enumerate(lda_model[corpus]):
+        row = sorted(row, key=lambda x: (x[1]), reverse=True)
+        # Get the Dominant topic, Perc Contribution and Keywords for each document
+        for j, (topic_num, prop_topic) in enumerate(row):
+            if j == 0:  # => dominant topic
+                wp = lda_model.show_topic(topic_num)
+                topic_keywords = ", ".join([word for word, prop in wp])
+                topics_df = topics_df.append(pd.Series([int(topic_num), round(prop_topic,4), topic_keywords]), ignore_index=True)
+            else:
+                break
+    topics_df.reset_index(inplace=True)
+    topics_df.columns = ['Document_No', 'Dominant_Topic', 'Top_Topic_Perc_Contrib', 'Keywords']
+    
+    return topics_df
+                 
+
+# EDA
+                 
+def plot_speeches_per_year(df, figsize = (8, 6), color='#ffd966'):
+    fig = plt.figure(figsize = figsize)
+    count_by_year = df.groupby('speech_year').count()['index_no'].reset_index()
+    sns.barplot(data = count_by_year, x = 'speech_year', y = 'index_no', color = color)
+    plt.xticks(rotation=90)
+    plt.xlabel('Speech Year', fontsize=14)
+    plt.ylabel('Number of Speeches', fontsize=14)
+    plt.title('Number of Speeches per Year', fontsize=18)
+
+    plt.show()
+
+def plot_polarity_dist_per_year(df, figsize = (8, 6), color='#ffd966'):
+    fig = plt.figure(figsize = figsize)
+    sns.boxplot(data=df, x = 'speech_year', y = 'polarity', color = color)
+    plt.xticks(rotation=90)
+    plt.xlabel('Speech Year', fontsize=14)
+    plt.ylabel('Polarity', fontsize=14)
+    plt.title('Fed Speech Sentiment (Positive/Negative)', fontsize=18)
+
+    plt.show()
+
+def plot_subjectivity_dist_per_year(df, figsize = (8, 6), color='#ffd966'):
+    fig = plt.figure(figsize = figsize)
+    sns.boxplot(data=df, x = 'speech_year', y = 'subjectivity', color = color)
+    plt.xticks(rotation=90)
+    plt.xlabel('Speech Year', fontsize=14)
+    plt.ylabel('Subjectivity', fontsize=14)
+    plt.title('Fed Speech Subjectivity (Positive/Negative)', fontsize=18)
+
+    plt.show()
+
